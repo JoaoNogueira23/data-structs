@@ -23,6 +23,8 @@ typedef struct
 } PriorityQueue;
 
 #define PAI(i) ((i-1)/2)
+#define F_LEFT(i) (2*i + 1)
+#define F_RIGHT(i) (2*i + 2)
 
 void swap(int *a, int *b){
     int temp = *a;
@@ -37,13 +39,40 @@ PriorityQueue criar_filaprio(int tam) {
     return *fprio;
 }
 
+// ajusta a regra do pai ser o valor maximo
+void sobe_no_heap(PriorityQueue *fprio, int k){
+    if(k > 0 && fprio -> v[PAI(k)].key < fprio->v[k].key){
+        swap(&fprio->v[k], &fprio->v[PAI(k)]);
+        sobe_no_heap(fprio, PAI(k));
+    }
+}
+
 void insere(PriorityQueue *fprio, Item item) {
     fprio->v[fprio->n] = item;
     fprio->n++;
 }
 
 
+
+void desce_no_heap(PriorityQueue *fprio, int k){
+    int maior_filho;
+    if(F_LEFT(k) < fprio -> n){
+        maior_filho = F_LEFT(k);
+        if(F_RIGHT(k) < fprio -> n && fprio->v[F_LEFT(k)].key < fprio->v[maior_filho].key)
+            maior_filho = F_RIGHT(k);
+        if(fprio->v[k].key < fprio->v[maior_filho].key) {
+            swap(&fprio->v[k], &fprio->v[maior_filho]);
+            desce_no_heap(fprio, maior_filho);
+        }  
+    }
+}
+
+
 Item extrai_maximo(PriorityQueue *fprio) {
+    /*
+    A diferença aqui para a fila de prioridade é que precisa ajustar os 
+    filhos para que o pai tenha os filhos esquerdo e direito
+    */
     int j, max = 0;
     for (j = 1; j < fprio->n; j++){
         if (fprio->v[max].key < fprio->v[j].key)
