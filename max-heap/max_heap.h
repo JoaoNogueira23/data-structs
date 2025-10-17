@@ -79,3 +79,13 @@ Item extrai_maximo(PriorityQueue *fprio) {
     desce_no_heap(fprio, 0);
     return item;
 }
+
+void change_priority(PriorityQueue *fprio, int k, int value){
+    if(fprio->v[k].key < value){
+        fprio->v[k].key = value;
+        sobe_no_heap(fprio, k);
+    }else{
+        fprio->v[k].key = value;
+        desce_no_heap(fprio, k);
+    }
+}
