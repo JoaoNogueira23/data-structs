@@ -58,7 +58,7 @@ void desce_no_heap(PriorityQueue *fprio, int k){
     int maior_filho;
     if(F_LEFT(k) < fprio -> n){
         maior_filho = F_LEFT(k);
-        if(F_RIGHT(k) < fprio -> n && fprio->v[F_LEFT(k)].key < fprio->v[maior_filho].key)
+        if(F_RIGHT(k) < fprio -> n && fprio->v[F_LEFT(k)].key < fprio->v[F_RIGHT(k)].key)
             maior_filho = F_RIGHT(k);
         if(fprio->v[k].key < fprio->v[maior_filho].key) {
             swap(&fprio->v[k], &fprio->v[maior_filho]);
@@ -73,12 +73,9 @@ Item extrai_maximo(PriorityQueue *fprio) {
     A diferença aqui para a fila de prioridade é que precisa ajustar os 
     filhos para que o pai tenha os filhos esquerdo e direito
     */
-    int j, max = 0;
-    for (j = 1; j < fprio->n; j++){
-        if (fprio->v[max].key < fprio->v[j].key)
-        max = j;
-    }
-    swap(&(fprio->v[max]), &(fprio->v[fprio->n-1]));
+    Item item = fprio->v[0];
+    swap(&(fprio->v[0]), &(fprio->v[fprio->n-1]));
     fprio->n--;
-    return fprio->v[fprio->n];
+    desce_no_heap(fprio, 0);
+    return item;
 }
