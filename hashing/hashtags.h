@@ -133,4 +133,22 @@ void change_file(char *filename, char *new_filename, char *new_describe, HashTab
     strcpy(file->describe, new_describe);
 }
 
+
+void insert_tag(char *filename, char *new_tag, HashTableFiles *files){
+    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+    // loop para validar se a key é a correta ou existe colisao
+    Archieve *file = files->array[key_file];
+    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
+        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
+            return;
+        }
+
+        // atualizando a key
+        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+        Archieve *file = files->array[key_file];
+    }
+
+    insert_tag_filename(file, new_tag);
+}
+
 #endif // AGENDA_H
