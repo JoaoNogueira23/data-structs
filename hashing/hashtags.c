@@ -35,6 +35,7 @@ int main(){
         }else if(strcmp(op, "INSERIR TAG") == 0){
             char filename[MAX_SIZE_NAMES];
             char tag_to_insert[MAX_SIZE_NAMES];
+            insert_tag(filename, tag_to_insert, files);
         }else if(strcmp(op, "REMOVER TAG") == 0){
             char filename[MAX_SIZE_NAMES];
             char tag_to_remove[MAX_SIZE_NAMES];
