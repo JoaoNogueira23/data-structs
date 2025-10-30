@@ -30,6 +30,7 @@ int main(){
             char filename_changed[MAX_SIZE_NAMES];
             char new_filename[MAX_SIZE_NAMES];
             char new_describe_file[MAX_SIZE_DESCRIBE];
+            change_file(filename_changed, new_filename, new_describe_file, files);
             // chama a funcao
         }else if(strcmp(op, "INSERIR TAG") == 0){
             char filename[MAX_SIZE_NAMES];

@@ -115,4 +115,22 @@ void remove_file(char *filename, HashTableFiles *files){
     free(files->array[key_file]);
 }
 
+void change_file(char *filename, char *new_filename, char *new_describe, HashTableFiles *files){
+    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+    // loop para validar se a key é a correta ou existe colisao
+    Archieve *file = files->array[key_file];
+    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
+        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
+            return;
+        }
+
+        // atualizando a key
+        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+        Archieve *file = files->array[key_file];
+    }
+
+    strcpy(file->archieve_name, new_filename);
+    strcpy(file->describe, new_describe);
+}
+
 #endif // AGENDA_H
