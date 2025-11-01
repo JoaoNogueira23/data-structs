@@ -1,15 +1,18 @@
 #include "hashtags.h"
 
-
-
 int main(){
     char op[MAX_LEN_OP];
 
     HashTableFiles *files;
     HashTableTags *tags;
-    
-    while(scanf("%s", op) && strcmp(op, "ENCERRAR") != 0){
-        if(strcmp(op, "INSERIR ARQUIVO") == 0){
+    char op[128];
+    while(fgets(op, sizeof op, stdin)){
+        // ajustando a leitura da entrada
+        op[strcspn(op, "\r\n")] = "\0";
+
+        if(strcmp(op, "ENCERRAR") == 0) break;
+        else if(strcmp(op, "INSERIR ARQUIVO") == 0){
+            
             char filename[MAX_SIZE_NAMES];
             char describe_file[MAX_SIZE_DESCRIBE];
             int amount_tags_file;
