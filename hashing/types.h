@@ -38,7 +38,6 @@ typedef struct Tag {
     char name[MAX_SIZE_NAMES];       // alocado uma vez
     File **files;     // array dinâmico de File* (lista invertida)
     int file_count;
-
 } Tag;
 
 typedef struct HashTableTags {

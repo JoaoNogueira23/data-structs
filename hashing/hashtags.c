@@ -1,29 +1,28 @@
 #include "hashtags.h"
 
+
+
 int main(){
     char op[MAX_LEN_OP];
 
     HashTableFiles *files;
     HashTableTags *tags;
-    char op[128];
-    while(fgets(op, sizeof op, stdin)){
-        // ajustando a leitura da entrada
-        op[strcspn(op, "\r\n")] = "\0";
-
-        if(strcmp(op, "ENCERRAR") == 0) break;
-        else if(strcmp(op, "INSERIR ARQUIVO") == 0){
+    
+    while(scanf("%s", op) && strcmp(op, "ENCERRAR") != 0){
+        if(strcmp(op, "INSERIR ARQUIVO") == 0){
+            File *new_file = (File *)malloc(sizeof(File));
+            // build do arquivo
+            scanf("%s", new_file->name);
+            scanf("%s", new_file->description);
+            scanf("%d", new_file->total_tags);
+            new_file->insertion_index = ++g_insertion_counter;
             
-            char filename[MAX_SIZE_NAMES];
-            char describe_file[MAX_SIZE_DESCRIBE];
-            int amount_tags_file;
-            scanf("%s", filename);
-            scanf("%s", describe_file);
-            scanf("%d", &amount_tags_file);
-
-            int aux_for_allocation = amount_tags_file*MAX_SIZE_NAMES + amount_tags_file;
+            // leitura das tags
+            int aux_for_allocation = new_file->total_tags*MAX_SIZE_NAMES + new_file->total_tags;
             char tags_list_str[aux_for_allocation];
             scanf("%s", tags_list_str);
-            insert_file(filename, describe_file, tags_list_str, files, amount_tags_file);            
+            insert_tags(tags_list_str, new_file, tags);
+            insert_file_to_hashfile(new_file, files);
 
         }else if(strcmp(op, "REMOVER ARQUIVO") == 0){
             char filename_remove[MAX_SIZE_NAMES];
@@ -34,14 +33,14 @@ int main(){
             char new_filename[MAX_SIZE_NAMES];
             char new_describe_file[MAX_SIZE_DESCRIBE];
             change_file(filename_changed, new_filename, new_describe_file, files);
-            // chama a funcao
         }else if(strcmp(op, "INSERIR TAG") == 0){
             char filename[MAX_SIZE_NAMES];
             char tag_to_insert[MAX_SIZE_NAMES];
-            insert_tag(filename, tag_to_insert, files);
+            insert_tag(filename, tag_to_insert, files, tags);
         }else if(strcmp(op, "REMOVER TAG") == 0){
             char filename[MAX_SIZE_NAMES];
             char tag_to_remove[MAX_SIZE_NAMES];
+            remove_tag(filename, tag_to_remove, files);
         }else if(strcmp(op, "BUSCAR TAG") == 0){
             char tag_to_search[MAX_SIZE_NAMES];
             scanf("%s", tag_to_search);

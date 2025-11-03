@@ -152,10 +152,26 @@ void insert_tag(char *filename, char *new_tag, HashTableFiles *files, HashTableT
 }
 
 void remove_tag(char *filename, char *tag_to_remove, HashTableFiles *files){
-    File *file = find_file(filename, files);
+    File *file_to_update = find_file(filename, files);
 
     // fazer um algoritmo de busca da tag no array dinamico
+    int tag_index = -1;
+    for (int i = 0; i<file_to_update->total_tags; i++){
+        if(strcmp(file_to_update->tags[i]->name, tag_to_remove) == 0){
+            tag_index = i;
+            break; // tag encontrada
+        }
+    }
 
+    file_to_update->total_tags--; // atualizando o numero de tags
+
+    if(file_to_update->total_tags>0){
+        file_to_update = (Tag **)realloc(file_to_update->tags, file_to_update->total_tags * sizeof(Tag *));
+
+    }else{
+        free(file_to_update->tags);
+        file_to_update = NULL;
+    }
 }
 
 
