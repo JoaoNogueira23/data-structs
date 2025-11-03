@@ -1,56 +1,83 @@
 #ifndef HASHING_H
+#include "types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_SIZE_NAMES 31
-#define MAX_AMOUNT_ARCHIEVES 2000
-#define MAX_AMOUNT_TAGS 30
-#define MAX_SIZE_DESCRIBE 100
-#define MAX_LEN_OP 20
-#define MAX 1783
-
-// estrutura basica dos dados
-typedef struct tag{
-    char tag_name[MAX_SIZE_NAMES];
-} Tag;
-
-typedef struct{
-    char archieve_name[MAX_SIZE_NAMES];
-    char describe[MAX_SIZE_NAMES];
-    char *tags_list; //pilha
-    int amount_tags;
-} Archieve;
-typedef struct {
-    char key[MAX_SIZE_NAMES];
-} Key;
-
-typedef struct hash_table_files{
-    Archieve *array[MAX_AMOUNT_ARCHIEVES];
-} HashTableFiles;
-
-typedef struct hash_table_tags{
-    Tag *array[MAX_AMOUNT_TAGS];
-} HashTableTags;
-
-
-int hash_function(char *key){
+int hash_function(char *key, int factor){
     int n = 0;
     for (int i =0; i<strlen(key); i++){
-        n = (256 * n + key[i]) % MAX;
+        n = (256 * n + key[i]) % factor;
     }
 
     return n;
 }
 
-int insert_tag_filename(Archieve *file, char *tag){
-    strcpy(file->tags_list[file->amount_tags], tag);
-    file->amount_tags++; // atualizando o tamanho da pilha
+File *find_file(char *filename, HashTableFiles *files){
+    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
+    // loop para validar se a key é a correta ou existe colisao
+    File *file = files->slots[key_file];
+    for(int i = 1; i< MAX_AMOUNT_ARCHIEVES;i++){
+        if(file != NULL && strcmp(file->name, filename) == 0){
+            // arquivo encontrado
+            break;
+        }
+
+        // atualizando a key
+        key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+        file = files->slots[key_file];
+    }
+}
+
+Tag *find_tag(char *tagname, HashTableTags *tags){
+    int key_tag = hash_function(tagname, MAX_AMOUNT_TAGS);
+
+    Tag *tag_to_remove = tags->array[key_tag];
+    for(int i = 1; i< MAX_AMOUNT_TAGS;i++){
+        if(tag_to_remove != NULL && strcmp(tag_to_remove->name, tagname) == 0){
+            // arquivo encontrado
+            break;
+        }
+
+        // atualizando a key
+        key_tag = (key_tag + i) % MAX_AMOUNT_TAGS;
+        tag_to_remove = tags->array[key_tag];
+    }
+}
+
+
+
+int add_tag_to_file(File *file, char *tagname, HashTableTags *tags){
+    Tag *tag = (Tag *)malloc(sizeof(Tag));
+    strcpy(tag->name, tagname);
+
+    // inserindo um ponteiro para o arquivo no array de indice invertido das tags
+    tag->files[tag->file_count++] = file;
+
+    // inserindo tag na hash table de tags
+    int index_to_tag = hash_function(tagname, MAX_AMOUNT_TAGS);
+
+    // tratando posiveis colisoes
+    for(int i = 1; i< MAX_AMOUNT_TAGS;i++){
+        if(tag != NULL && strcmp(tag->name, tagname) == 0){
+            // arquivo encontrado
+            break;
+        }
+
+        // atualizando a key
+        index_to_tag = (index_to_tag + i) % MAX_AMOUNT_TAGS;
+    }
+
+    tags->array[index_to_tag] = tag;
+
+    // inserindo os indices invertidos para cada tag no arquivo (referencia para as tags que o arquivo possui)
+    file->tags[file->total_tags++] = tag;
 };
 
 // inserir novo arquivo
-void process_tags_input(char *tags_string, Archieve *file, int amount_tags){
+void insert_tags(char *tags_string, File *file, HashTableTags *tags){
     int tags_inserted = 0;
+    int amount_tags = file->total_tags;
 
     const char *delimiter = " ";
 
@@ -60,7 +87,7 @@ void process_tags_input(char *tags_string, Archieve *file, int amount_tags){
             if(tags_inserted == amount_tags){
                 break;
             }
-            if(insert_tag_filename(file, tag) == 0){
+            if(add_tag_to_file(file, tag, tags) == 0){
                 tags_inserted++;
             }else{
                 printf("Erro inesperado na insercao de tag");
@@ -71,99 +98,64 @@ void process_tags_input(char *tags_string, Archieve *file, int amount_tags){
     }
 }
 
-void insert_file(char *filename, char *describe, char *tags_list_str, HashTableFiles *files, int amount_tags){
-    
 
-    // build archieve
-    Archieve *archieve_inserted = (Archieve *)malloc(sizeof(Archieve));
-    strcpy(archieve_inserted->archieve_name, filename);
-    strcpy(archieve_inserted->describe, describe);
-    archieve_inserted->amount_tags = 0;
-
-    // inserindo as tags
-    process_tags_input(tags_list_str, archieve_inserted, amount_tags);
-
-    // inserindo o arquivo na tabela
-    int key_to_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+void insert_file_to_hashfile(File *archieve_inserted, HashTableFiles *files){
+    // inserindo o arquivo na hash table dos arquivos
+    int key_to_file = hash_function(archieve_inserted->name, MAX_AMOUNT_ARCHIEVES);
 
     // tratando colisoes com sondagem linearchat
-    while(files->array[key_to_file] != NULL){
-        // tratamento linear
-        key_to_file = (key_to_file + 1) % MAX_AMOUNT_ARCHIEVES;
-    }
+    for(int i = 1; i < MAX_AMOUNT_TAGS; i++){
+        if (files->slots[key_to_file] != NULL){
+            break;
+        }
 
-    files->array[key_to_file] = archieve_inserted;
-    
+        // sondagem linear
+        key_to_file = (key_to_file + i) % MAX_AMOUNT_TAGS;
+    }
+    files->slots[key_to_file] = archieve_inserted;
 };
 
 void remove_file(char *filename, HashTableFiles *files){
-    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES); 
 
     // loop para validar se a key é a correta ou existe colisao
-    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
-        Archieve *file = files->array[key_file];
-        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
-            free(file);
-            files->array[key_file] == NULL;
+    for(int i = 1; i< MAX_AMOUNT_ARCHIEVES;i++){
+        File *file = files->slots[key_file];
+        // arquivo resgatado
+        if(file != NULL && strcmp(file->name, filename) == 0){
+            files->slots[key_file] = NULL;
             return;
         }
 
         // atualizando a key
-        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+        key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
     }
 
-    free(files->array[key_file]);
+    files->slots[key_file] = NULL;
 }
+
 
 void change_file(char *filename, char *new_filename, char *new_describe, HashTableFiles *files){
-    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
     // loop para validar se a key é a correta ou existe colisao
-    Archieve *file = files->array[key_file];
-    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
-        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
-            return;
-        }
+    File *file = find_file(filename, files);
 
-        // atualizando a key
-        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
-        Archieve *file = files->array[key_file];
-    }
-
-    strcpy(file->archieve_name, new_filename);
-    strcpy(file->describe, new_describe);
+    strcpy(file->name, new_filename);
+    strcpy(file->description, new_describe);
 }
 
-void insert_tag(char *filename, char *new_tag, HashTableFiles *files){
-    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
+void insert_tag(char *filename, char *new_tag, HashTableFiles *files, HashTableTags *tags){
+    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
     // loop para validar se a key é a correta ou existe colisao
-    Archieve *file = files->array[key_file];
-    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
-        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
-            return;
-        }
-
-        // atualizando a key
-        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
-        Archieve *file = files->array[key_file];
-    }
-
-    insert_tag_filename(file, new_tag);
+    File *file_to_insert_tag = find_file(filename, files);
+    add_tag_to_file(file_to_insert_tag, new_tag, tags);
 }
 
 void remove_tag(char *filename, char *tag_to_remove, HashTableFiles *files){
-    int key_file = hash_function(filename) % MAX_AMOUNT_ARCHIEVES;
-    // loop para validar se a key é a correta ou existe colisao
-    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
-        Archieve *file = files->array[key_file];
-        if(file != NULL && strcmp(file->archieve_name, filename) == 0){
-            free(file);
-            files->array[key_file] == NULL;
-            break;
-        }
-        // atualizando a key
-        int key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
-        
-    }
+    File *file = find_file(filename, files);
+
+    // fazer um algoritmo de busca da tag no array dinamico
+
 }
 
 
