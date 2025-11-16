@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 int hash_function(char *key, int factor){
     int n = 0;
@@ -13,81 +14,137 @@ int hash_function(char *key, int factor){
     return n;
 }
 
+HashTableFiles *create_hashtable_file(){
+    HashTableFiles *ht_files =(HashTableFiles *)malloc(sizeof(HashTableFiles));
+
+    ht_files->slots = (FileSlot **)calloc(MAX_AMOUNT_ARCHIEVES, sizeof(FileSlot *));
+
+    return ht_files;
+}
+
+HashTableTags *create_ht_tag(){
+    HashTableTags *ht_tags = malloc(sizeof(HashTableTags));
+    for (int i = 0; i < MAX_AMOUNT_TAGS; i++)
+        ht_tags->array[i] = NULL;
+    ht_tags->slots = NULL;
+    return ht_tags;
+}
+
 File *find_file(char *filename, HashTableFiles *files){
     int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
     // loop para validar se a key é a correta ou existe colisao
-    File *file = files->slots[key_file];
-    for(int i = 1; i< MAX_AMOUNT_ARCHIEVES;i++){
-        if(file != NULL && strcmp(file->name, filename) == 0){
-            // arquivo encontrado
-            break;
+    File *file = NULL;
+
+    for(int i = 0; i< MAX_AMOUNT_ARCHIEVES;i++){
+        int current_key = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+
+        if(files->slots[current_key] == NULL){
+            return NULL;
         }
 
-        // atualizando a key
-        key_file = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
-        file = files->slots[key_file];
+        file = files->slots[current_key]->file;
+
+        if(file == NULL){
+            continue;
+        }
+
+        if(strcmp(file->name, filename) == 0){
+            return file; // Arquivo encontrado
+        }
     }
+
+    return file;
 }
+
+File *find_file(char *filename, HashTableFiles *files) {
+    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
+
+    for (int i = 0; i < MAX_AMOUNT_ARCHIEVES; i++) {
+        int current_key = (key_file + i) % MAX_AMOUNT_ARCHIEVES;
+        FileSlot *slot = files->slots[current_key];
+
+        if (slot == NULL) {
+            // encontrou espaço vazio -> chave não está na tabela
+            // MAS só podemos garantir isso se não houver "tombstones" (remoções)
+            return NULL;
+        }
+
+        if (slot->file == NULL) {
+            // posição deletada, segue sondando
+            continue;
+        }
+
+        if (strcmp(slot->file->name, filename) == 0) {
+            return slot->file;
+        }
+    }
+
+    return NULL; // não achou após sondar tudo
+}
+
 
 Tag *find_tag(char *tagname, HashTableTags *tags){
     int key_tag = hash_function(tagname, MAX_AMOUNT_TAGS);
 
-    Tag *tag_to_remove = tags->array[key_tag];
+    Tag *tag = tags->array[key_tag];
     for(int i = 1; i< MAX_AMOUNT_TAGS;i++){
-        if(tag_to_remove != NULL && strcmp(tag_to_remove->name, tagname) == 0){
-            // arquivo encontrado
-            break;
+        int current_key = (key_tag + i) % MAX_AMOUNT_TAGS;
+        Tag *current_tag = tags->array[current_key];
+
+        if (current_tag == NULL){
+            // tag nao foi inserida
+            return NULL;
         }
 
-        // atualizando a key
-        key_tag = (key_tag + i) % MAX_AMOUNT_TAGS;
-        tag_to_remove = tags->array[key_tag];
+        if(strcmp(tag->name, tagname) == 0){
+            // tag encontrada
+            return current_tag;
+        }
+
     }
+    return NULL;
 }
 
+int add_tag_to_file(File *file, char *tagname, HashTableTags *tags, int init_total_tag) {
+    Tag *current_tag = find_tag(tagname, tags);
 
-
-int add_tag_to_file(File *file, char *tagname, HashTableTags *tags){
-    Tag *tag = (Tag *)malloc(sizeof(Tag));
-    strcpy(tag->name, tagname);
-
-    // inserindo um ponteiro para o arquivo no array de indice invertido das tags
-    tag->files[tag->file_count++] = file;
-
-    // inserindo tag na hash table de tags
-    int index_to_tag = hash_function(tagname, MAX_AMOUNT_TAGS);
-
-    // tratando posiveis colisoes
-    for(int i = 1; i< MAX_AMOUNT_TAGS;i++){
-        if(tag != NULL && strcmp(tag->name, tagname) == 0){
-            // arquivo encontrado
-            break;
-        }
-
-        // atualizando a key
-        index_to_tag = (index_to_tag + i) % MAX_AMOUNT_TAGS;
+    if (init_total_tag == 0) {
+        file->tags = (Tag **) calloc(MAX_AMOUNT_TAGS, sizeof(Tag *));
+        file->total_tags = 0;
     }
 
-    tags->array[index_to_tag] = tag;
+    if (current_tag == NULL) {
+        // criar nova tag
+        current_tag = (Tag *) malloc(sizeof(Tag));
+        strcpy(current_tag->name, tagname);
 
-    // inserindo os indices invertidos para cada tag no arquivo (referencia para as tags que o arquivo possui)
-    file->tags[file->total_tags++] = tag;
-};
+        current_tag->files = (File **) calloc(MAX_AMOUNT_ARCHIEVES, sizeof(File *));
+        current_tag->file_count = 0;
+
+        current_tag->files[current_tag->file_count++] = file; 
+    } else {
+        current_tag->files[current_tag->file_count++] = file;
+    }
+
+    file->tags[init_total_tag] = current_tag;
+
+    if (init_total_tag >= file->total_tags) {
+        file->total_tags = init_total_tag + 1;
+    }
+
+    return 1;
+}
 
 // inserir novo arquivo
-void insert_tags(char *tags_string, File *file, HashTableTags *tags){
+void insert_tags_from_new_file(char *tags_string, File *file, HashTableTags *tags){
     int tags_inserted = 0;
-    int amount_tags = file->total_tags;
 
     const char *delimiter = " ";
 
     char *tag = strtok(tags_string, delimiter);
     while(tag != NULL){
         if (strlen(tag)>0){
-            if(tags_inserted == amount_tags){
-                break;
-            }
-            if(add_tag_to_file(file, tag, tags) == 0){
+            if(add_tag_to_file(file, tag, tags, tags_inserted)){
                 tags_inserted++;
             }else{
                 printf("Erro inesperado na insercao de tag");
@@ -104,15 +161,20 @@ void insert_file_to_hashfile(File *archieve_inserted, HashTableFiles *files){
     int key_to_file = hash_function(archieve_inserted->name, MAX_AMOUNT_ARCHIEVES);
 
     // tratando colisoes com sondagem linearchat
-    for(int i = 1; i < MAX_AMOUNT_TAGS; i++){
-        if (files->slots[key_to_file] != NULL){
-            break;
-        }
+    for(int i = 0; i < MAX_AMOUNT_ARCHIEVES; i++){
+        int current_key = (key_to_file + i) % MAX_AMOUNT_ARCHIEVES;
 
-        // sondagem linear
-        key_to_file = (key_to_file + i) % MAX_AMOUNT_TAGS;
+        if (files->slots[current_key] == NULL){
+            files->slots[current_key] = (FileSlot *)malloc(sizeof(FileSlot));
+            if (files->slots[current_key] == NULL) {
+                return; 
+            }
+            
+            files->slots[current_key]->file = archieve_inserted;
+            
+            return;
+        }
     }
-    files->slots[key_to_file] = archieve_inserted;
 };
 
 void remove_file(char *filename, HashTableFiles *files){
@@ -120,7 +182,7 @@ void remove_file(char *filename, HashTableFiles *files){
 
     // loop para validar se a key é a correta ou existe colisao
     for(int i = 1; i< MAX_AMOUNT_ARCHIEVES;i++){
-        File *file = files->slots[key_file];
+        File *file = files->slots[key_file]->file;
         // arquivo resgatado
         if(file != NULL && strcmp(file->name, filename) == 0){
             files->slots[key_file] = NULL;
@@ -136,7 +198,6 @@ void remove_file(char *filename, HashTableFiles *files){
 
 
 void change_file(char *filename, char *new_filename, char *new_describe, HashTableFiles *files){
-    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
     // loop para validar se a key é a correta ou existe colisao
     File *file = find_file(filename, files);
 
@@ -145,33 +206,73 @@ void change_file(char *filename, char *new_filename, char *new_describe, HashTab
 }
 
 void insert_tag(char *filename, char *new_tag, HashTableFiles *files, HashTableTags *tags){
-    int key_file = hash_function(filename, MAX_AMOUNT_ARCHIEVES);
     // loop para validar se a key é a correta ou existe colisao
     File *file_to_insert_tag = find_file(filename, files);
-    add_tag_to_file(file_to_insert_tag, new_tag, tags);
+    add_tag_to_file(file_to_insert_tag, new_tag, tags, file_to_insert_tag->total_tags);
+
+    file_to_insert_tag->total_tags++; //atualizando a quantidade de tags
 }
 
-void remove_tag(char *filename, char *tag_to_remove, HashTableFiles *files){
+
+void remove_tag(char *filename, char *tag_name_to_remove, HashTableFiles *files){
     File *file_to_update = find_file(filename, files);
 
-    // fazer um algoritmo de busca da tag no array dinamico
-    int tag_index = -1;
-    for (int i = 0; i<file_to_update->total_tags; i++){
-        if(strcmp(file_to_update->tags[i]->name, tag_to_remove) == 0){
+    int tag_index = -1; // Variável para guardar o índice da tag
+    for (int i = 0; i < file_to_update->total_tags; i++) {
+        if (strcmp(file_to_update->tags[i]->name, tag_name_to_remove) == 0) {
             tag_index = i;
-            break; // tag encontrada
+            break; // Tag encontrada
         }
     }
-
-    file_to_update->total_tags--; // atualizando o numero de tags
-
-    if(file_to_update->total_tags>0){
-        file_to_update = (Tag **)realloc(file_to_update->tags, file_to_update->total_tags * sizeof(Tag *));
-
-    }else{
-        free(file_to_update->tags);
-        file_to_update = NULL;
+    // Desloca todos os elementos após o 'tag_index' uma posição para trás
+    for (int i = tag_index; i < file_to_update->total_tags - 1; i++) {
+        file_to_update->tags[i] = file_to_update->tags[i + 1];
     }
+    file_to_update->total_tags--;
+
+    // Realocação de Memória
+    if (file_to_update->total_tags > 0) {
+        // Realoca para o novo tamanho (total_tags)
+        Tag **new_tags = (Tag **)realloc(file_to_update->tags, 
+                                        file_to_update->total_tags * sizeof(Tag *));
+        
+        file_to_update->tags = new_tags;
+
+    } else {
+        free(file_to_update->tags);
+        file_to_update->tags = NULL; 
+    }
+    
+}
+
+void search_by_tag(char *tagname, HashTableTags *tags){
+    Tag *tag = find_tag(tagname, tags); // sem colisoes faz a busca em O(1)
+
+    printf("Busca por %s\n", tagname);
+
+    for (int i = 0; i<tag->file_count; i++){
+        printf("%s\n", tag->files[i]->name);
+    }
+
+    printf("----------\n");
+
+}
+
+void search_by_file(char *filename, HashTableFiles *files){
+    File *file = find_file(filename, files);
+
+    if (file != NULL){
+        printf("Descrição: %s\n", file->description);
+
+        printf("Tags: ");
+        for(int i = 0; i < file->total_tags && file->tags[i] != NULL; i++){
+            printf("%s ", file->tags[i]->name);
+        }
+        printf("----------\n");
+    }else{
+        printf("Arquivo %s não existe\n", filename);
+    }
+
 }
 
 
